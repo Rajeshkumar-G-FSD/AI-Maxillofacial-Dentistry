@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Clock,
   CreditCard,
+  Filter,
   FileText,
   Lock,
   LogOut,
@@ -14,6 +15,7 @@ import {
   Search,
   ShieldCheck,
   Stethoscope,
+  Timer,
   User,
   X,
 } from 'lucide-react';
@@ -33,6 +35,7 @@ const DoctorPortal = ({ isOpen, onClose }) => {
   const [activePatientView, setActivePatientView] = useState('diagram');
   const [clinicUpiId, setClinicUpiId] = useState('aidentel@upi');
   const [carePanelStatus, setCarePanelStatus] = useState('Planned');
+  const [filterDates, setFilterDates] = useState({ from: '', to: '' });
 
   useEffect(() => {
     if (!isOpen) {
@@ -93,9 +96,13 @@ const DoctorPortal = ({ isOpen, onClose }) => {
         .join(' ')
         .toLowerCase();
 
-      return searchable.includes(term);
+      const matchesTerm = searchable.includes(term);
+      const matchesFrom = !filterDates.from || appointment.appointmentDate >= filterDates.from;
+      const matchesTo = !filterDates.to || appointment.appointmentDate <= filterDates.to;
+
+      return matchesTerm && matchesFrom && matchesTo;
     });
-  }, [appointments, searchTerm]);
+  }, [appointments, filterDates, searchTerm]);
 
   const todayCount = appointments.filter((appointment) => {
     const today = new Date().toISOString().split('T')[0];
@@ -105,6 +112,48 @@ const DoctorPortal = ({ isOpen, onClose }) => {
   const nextAppointment = appointments
     .filter((appointment) => appointment.appointmentDate)
     .sort((a, b) => `${a.appointmentDate} ${a.timeSlot}`.localeCompare(`${b.appointmentDate} ${b.timeSlot}`))[0];
+
+  const pendingCount = appointments.filter((appointment) => appointment.status !== 'completed').length;
+  const outstandingDue = appointments.reduce((total, appointment) => {
+    const appointmentText = `${appointment.service || ''} ${appointment.appointmentType || ''}`.toLowerCase();
+    const estimate = appointmentText.includes('implant') || appointmentText.includes('surgery')
+      ? 4500
+      : appointmentText.includes('root') || appointmentText.includes('canal')
+        ? 3500
+        : 1200;
+    return total + estimate;
+  }, 0);
+
+  const dashboardMetricCards = [
+    {
+      label: 'Total Appointments',
+      value: appointments.length,
+      badge: 'All',
+      tone: 'purple',
+      icon: CalendarDays,
+    },
+    {
+      label: 'Pending Visits',
+      value: pendingCount,
+      badge: '0 Done',
+      tone: 'orange',
+      icon: Timer,
+    },
+    {
+      label: 'Revenue Collected',
+      value: '₹0',
+      badge: 'Collected',
+      tone: 'green',
+      icon: ShieldCheck,
+    },
+    {
+      label: 'Outstanding Due',
+      value: `₹${outstandingDue.toLocaleString('en-IN')}`,
+      badge: 'Unpaid',
+      tone: 'red',
+      icon: X,
+    },
+  ];
 
   const selectedAppointment = useMemo(() => {
     return appointments.find((appointment) => appointment.id === selectedAppointmentId) || appointments[0] || null;
@@ -266,6 +315,7 @@ const DoctorPortal = ({ isOpen, onClose }) => {
     setIsLoading(false);
     setFetchError('');
     setSearchTerm('');
+    setFilterDates({ from: '', to: '' });
     setSelectedAppointmentId('');
     setActivePatientView('diagram');
   };
@@ -388,31 +438,62 @@ const DoctorPortal = ({ isOpen, onClose }) => {
               </button>
             </div>
 
-            <div className="dashboard-stats">
-              <article>
-                <span>Total Requests</span>
-                <strong>{appointments.length}</strong>
-              </article>
-              <article>
-                <span>Today</span>
-                <strong>{todayCount}</strong>
-              </article>
-              <article>
-                <span>Next Slot</span>
-                <strong>{nextAppointment ? `${nextAppointment.appointmentDate} ${nextAppointment.timeSlot}` : 'None'}</strong>
-              </article>
+            <div className="dashboard-metric-grid">
+              {dashboardMetricCards.map((card) => {
+                const Icon = card.icon;
+                return (
+                  <article className="dashboard-metric-card" key={card.label}>
+                    <div className={`metric-icon ${card.tone}`}>
+                      <Icon size={26} />
+                    </div>
+                    <span className={`metric-badge ${card.tone}`}>{card.badge}</span>
+                    <strong>{card.value}</strong>
+                    <p>{card.label}</p>
+                  </article>
+                );
+              })}
             </div>
 
-            <div className="dashboard-toolbar">
-              <div className="dashboard-search">
-                <Search size={18} />
+            <div className="dashboard-filter-card">
+              <label className="filter-search-field">
+                <span>Search Patient</span>
+                <div>
+                  <Search size={22} />
+                  <input
+                    type="search"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Name, phone or clinical issue..."
+                  />
+                </div>
+              </label>
+
+              <label className="filter-date-field">
+                <span>From Date</span>
                 <input
-                  type="search"
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search patients, services, phone"
+                  type="date"
+                  value={filterDates.from}
+                  onChange={(event) => setFilterDates((prev) => ({ ...prev, from: event.target.value }))}
                 />
-              </div>
+              </label>
+
+              <label className="filter-date-field">
+                <span>To Date</span>
+                <input
+                  type="date"
+                  value={filterDates.to}
+                  onChange={(event) => setFilterDates((prev) => ({ ...prev, to: event.target.value }))}
+                />
+              </label>
+
+              <button className="filter-action-btn" type="button" aria-label="Apply filters">
+                <Filter size={26} />
+              </button>
+            </div>
+
+            <div className="dashboard-mini-summary">
+              <span>Today: <strong>{todayCount}</strong></span>
+              <span>Next Slot: <strong>{nextAppointment ? `${nextAppointment.appointmentDate} ${nextAppointment.timeSlot}` : 'None'}</strong></span>
             </div>
 
             {fetchError && (

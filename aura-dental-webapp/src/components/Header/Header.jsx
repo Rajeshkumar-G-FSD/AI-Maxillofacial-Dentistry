@@ -18,7 +18,7 @@ const Header = ({ onBookAppointment, onDoctorLogin }) => {
       <div className="container header-container">
         <div className="logo">
           <img
-            src="https://i.postimg.cc/Vv28j7Xd/AIDEntal.jpg"
+            src="/aidental-logo.jpg"
             alt="AI Dental Logo"
             className="logo-image"
           />
